@@ -30,11 +30,12 @@ app.use(helmet({
   contentSecurityPolicy: false, // Allow inline scripts for swagger UI
 }));
 
-// CORS
+// CORS - Allow all origins
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'x-api-key', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Length', 'X-Request-Id'],
 }));
 
 // Body parsing
