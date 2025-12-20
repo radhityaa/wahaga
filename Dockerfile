@@ -33,6 +33,8 @@ WORKDIR /app/dashboard
 COPY dashboard/package*.json ./
 RUN npm ci
 COPY dashboard/ ./
+# Set NODE_ENV so Vite uses correct base path
+ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 2: Production Image
@@ -73,8 +75,8 @@ RUN npx prisma@6 generate
 # Copy source code
 COPY src ./src
 
-# Copy built dashboard (Vite outputs to ../public/dashboard relative to dashboard folder)
-COPY --from=dashboard-builder /app/public/dashboard ./public/dashboard
+# Copy built dashboard (Vite outputs to dashboard/dist)
+COPY --from=dashboard-builder /app/dashboard/dist ./public/dashboard
 
 # Copy entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh

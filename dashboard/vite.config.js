@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Base path for production - dashboard is served at /dashboard/
+  base: process.env.NODE_ENV === 'production' ? '/dashboard/' : '/',
   server: {
     port: 5173,
     proxy: {
@@ -18,7 +20,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../public/dashboard',
+    outDir: 'dist',
     emptyOutDir: true,
   },
 });
