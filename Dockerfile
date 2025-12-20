@@ -73,8 +73,8 @@ RUN npx prisma generate
 # Copy source code
 COPY src ./src
 
-# Copy built dashboard
-COPY --from=dashboard-builder /app/dashboard/dist ./public/dashboard
+# Copy built dashboard (Vite outputs to ../public/dashboard relative to dashboard folder)
+COPY --from=dashboard-builder /app/public/dashboard ./public/dashboard
 
 # Copy entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh
