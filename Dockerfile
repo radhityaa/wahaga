@@ -26,7 +26,7 @@
 # =================================
 
 # Stage 1: Build Dashboard
-FROM node:18-alpine AS dashboard-builder
+FROM node:20-alpine AS dashboard-builder
 
 WORKDIR /app/dashboard
 
@@ -36,7 +36,7 @@ COPY dashboard/ ./
 RUN npm run build
 
 # Stage 2: Production Image
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 LABEL maintainer="WhatsApp Gateway"
 LABEL description="WhatsApp Gateway API - Multi-device support with Baileys"
