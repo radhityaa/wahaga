@@ -26,6 +26,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       
+      # Base URL for Swagger (set to your domain, e.g., https://api.example.com)
+      - BASE_URL=${BASE_URL:-}
+      
       # Database (SQLite built-in, no config needed)
       # Uncomment below to use external MySQL instead:
       # - DATABASE_URL=mysql://root:password@host.docker.internal:3306/whatsapp_gateway

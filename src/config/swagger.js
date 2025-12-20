@@ -1,5 +1,8 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 
+// Get base URL from env or default to localhost
+const baseUrl = process.env.BASE_URL || process.env.SWAGGER_URL || `http://localhost:${process.env.PORT || 3000}`;
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -18,8 +21,8 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Development server',
+        url: baseUrl,
+        description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
       },
     ],
     components: {
