@@ -67,8 +67,8 @@ COPY prisma/schema.sqlite.prisma ./prisma/schema.prisma
 # Install production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
-# Generate Prisma client for SQLite
-RUN npx prisma generate
+# Generate Prisma client for SQLite (pin to v6.x to avoid breaking changes in v7)
+RUN npx prisma@6 generate
 
 # Copy source code
 COPY src ./src
