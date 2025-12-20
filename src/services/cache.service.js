@@ -5,7 +5,9 @@ const { logger } = require('../utils/logger');
 
 class CacheService {
   constructor() {
-    this.useRedis = config.env === 'production' || process.env.USE_REDIS === 'true';
+    // Only use Redis if REDIS_URL is explicitly set and not empty
+    const hasRedisUrl = config.redisUrl && config.redisUrl.trim() !== '';
+    this.useRedis = hasRedisUrl && (config.env === 'production' || process.env.USE_REDIS === 'true');
     this.prefix = 'wag:';
     
     if (this.useRedis) {
