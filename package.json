@@ -1,0 +1,56 @@
+{
+  "name": "whatsapp-gateway",
+  "version": "1.0.0",
+  "description": "WhatsApp Gateway API with multi-device support using Baileys",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "keywords": [
+    "whatsapp",
+    "gateway",
+    "api",
+    "baileys",
+    "multi-device"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-async-handler": "^1.2.0",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.3.2",
+    "joi": "^17.11.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cache": "^5.1.2",
+    "pino": "^8.16.2",
+    "pino-pretty": "^10.2.3",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.7.0",
+    "eslint": "^8.55.0",
+    "nodemon": "^3.0.2",
+    "prisma": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

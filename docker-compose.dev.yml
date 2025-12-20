@@ -1,0 +1,104 @@
+version: "3.8"
+
+# =================================
+# WhatsApp Gateway - Development Setup
+# =================================
+# Use this for local development with hot-reload
+# Run: docker-compose -f docker-compose.dev.yml up
+# =================================
+
+services:
+  # =================================
+  # WhatsApp Gateway API (Development)
+  # =================================
+  whatsapp-gateway-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: whatsapp-gateway-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "5173:5173"  # Vite dev server for dashboard
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=mysql://root:devpassword@mysql-dev:3306/whatsapp_gateway
+      - REDIS_URL=redis://redis-dev:6379
+      - API_KEY=dev-api-key-12345
+      - WHATSAPP_SWAGGER_ENABLED=true
+      - DASHBOARD_ENABLED=true
+      - LOG_LEVEL=debug
+      - WA_MAX_SESSIONS=10
+    volumes:
+      # Mount source code for hot-reload
+      - ./src:/app/src:ro
+      - ./prisma:/app/prisma:ro
+      - ./dashboard/src:/app/dashboard/src:ro
+      # Persist data
+      - ./storage:/app/storage
+    depends_on:
+      mysql-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_started
+    networks:
+      - whatsapp-dev-network
+    command: npm run dev
+
+  # =================================
+  # MySQL Database (Development)
+  # =================================
+  mysql-dev:
+    image: mysql:8.0
+    container_name: whatsapp-mysql-dev
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=devpassword
+      - MYSQL_DATABASE=whatsapp_gateway
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - whatsapp-dev-network
+
+  # =================================
+  # Redis Cache (Development)
+  # =================================
+  redis-dev:
+    image: redis:7-alpine
+    container_name: whatsapp-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    networks:
+      - whatsapp-dev-network
+
+  # =================================
+  # Adminer (Database UI)
+  # =================================
+  adminer-dev:
+    image: adminer:latest
+    container_name: whatsapp-adminer-dev
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=mysql-dev
+    depends_on:
+      - mysql-dev
+    networks:
+      - whatsapp-dev-network
+
+volumes:
+  mysql_dev_data:
+
+networks:
+  whatsapp-dev-network:
+    driver: bridge

@@ -1,0 +1,68 @@
+# =================================
+# Docker Ignore File
+# =================================
+
+# Dependencies
+node_modules
+dashboard/node_modules
+
+# Development files
+.git
+.gitignore
+.env
+.env.local
+.env.development
+.env.test
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+*.test.js
+*.spec.js
+__tests__
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Storage (will be mounted as volumes)
+storage/sessions/*
+storage/uploads/*
+storage/logs/*
+!storage/.gitkeep
+
+# Documentation (optional, can be included if needed)
+docs
+
+# Build artifacts
+dist
+build
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (don't copy docker configs into image)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Development configs
+nodemon.json
+.eslintrc*
+.prettierrc*
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Dashboard build output (will be built in Docker)
+dashboard/dist
+public/dashboard

@@ -1,0 +1,126 @@
+// Prisma Schema for WhatsApp Gateway
+// MySQL version for development
+// Run: npx prisma generate && npx prisma db push
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Session model - menyimpan info session WhatsApp
+model Session {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  status      String    @default("disconnected") // connected, disconnected, connecting, qr
+  phone       String?
+  pushName    String?
+  profilePic  String?   @db.Text
+  qrCode      String?   @db.Text
+  lastSeen    DateTime?
+  isLegacy    Boolean   @default(false)
+  retryCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages Message[]
+  events   Event[]
+  webhooks Webhook[]
+
+  @@index([status])
+  @@index([name])
+}
+
+// Message model - log semua pesan
+model Message {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  messageId String   @unique // WhatsApp message ID
+  remoteJid String   // Sender/recipient JID
+  fromMe    Boolean
+  type      String   // text, image, video, audio, document, sticker, location, contact
+  content   String?  @db.Text
+  caption   String?  @db.Text
+  mediaUrl  String?  @db.Text
+  mimetype  String?
+  status    String   @default("pending") // pending, sent, delivered, read, failed
+  timestamp DateTime
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([remoteJid])
+  @@index([timestamp])
+  @@index([status])
+}
+
+// Event model - log semua events
+model Event {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type      String   // message.received, message.sent, presence.update, group.update, connection.update, etc.
+  data      Json
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([processed])
+}
+
+// Webhook model - webhook configurations
+model Webhook {
+  id           String    @id @default(uuid())
+  sessionId    String?
+  session      Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  url          String
+  events       Json      // Array of event types to subscribe ["message.received", "message.sent", etc.]
+  headers      Json?     // Custom headers {"Authorization": "Bearer xxx"}
+  isActive     Boolean   @default(true)
+  secret       String?   // For HMAC signature verification
+  retries      Int       @default(3)
+  lastTriggeredAt DateTime?
+  lastStatus   Int?      // Last HTTP status code
+  failCount    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([sessionId])
+  @@index([isActive])
+}
+
+// Settings model - konfigurasi sistem
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   @db.Text
+  type      String   @default("string") // string, number, boolean, json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// MessageQueue model - antrian pesan untuk retry
+model MessageQueue {
+  id          String   @id @default(uuid())
+  sessionId   String
+  recipient   String   // JID
+  type        String   // text, media, location, contact
+  payload     Json     // Message payload
+  status      String   @default("pending") // pending, processing, completed, failed
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  error       String?  @db.Text
+  scheduledAt DateTime @default(now())
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([sessionId])
+}

@@ -1,0 +1,126 @@
+// Prisma Schema for WhatsApp Gateway
+// SQLite version for Docker (built-in database)
+// This file is used during Docker build
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Session model - menyimpan info session WhatsApp
+model Session {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  status      String    @default("disconnected")
+  phone       String?
+  pushName    String?
+  profilePic  String?
+  qrCode      String?
+  lastSeen    DateTime?
+  isLegacy    Boolean   @default(false)
+  retryCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages Message[]
+  events   Event[]
+  webhooks Webhook[]
+
+  @@index([status])
+  @@index([name])
+}
+
+// Message model - log semua pesan
+model Message {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  messageId String   @unique
+  remoteJid String
+  fromMe    Boolean
+  type      String
+  content   String?
+  caption   String?
+  mediaUrl  String?
+  mimetype  String?
+  status    String   @default("pending")
+  timestamp DateTime
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([remoteJid])
+  @@index([timestamp])
+  @@index([status])
+}
+
+// Event model - log semua events
+model Event {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type      String
+  data      String
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([processed])
+}
+
+// Webhook model - webhook configurations
+model Webhook {
+  id           String    @id @default(uuid())
+  sessionId    String?
+  session      Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  url          String
+  events       String
+  headers      String?
+  isActive     Boolean   @default(true)
+  secret       String?
+  retries      Int       @default(3)
+  lastTriggeredAt DateTime?
+  lastStatus   Int?
+  failCount    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([sessionId])
+  @@index([isActive])
+}
+
+// Settings model - konfigurasi sistem
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// MessageQueue model - antrian pesan untuk retry
+model MessageQueue {
+  id          String   @id @default(uuid())
+  sessionId   String
+  recipient   String
+  type        String
+  payload     String
+  status      String   @default("pending")
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  error       String?
+  scheduledAt DateTime @default(now())
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([sessionId])
+}
