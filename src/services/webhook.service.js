@@ -66,18 +66,18 @@ class WebhookService {
     
     // Support both WAHA 'customHeaders' and legacy 'headers'
     const headers = data.customHeaders || data.headers || null;
+    const events = data.events || ['*'];
 
     return prisma.webhook.create({
       data: {
         url: data.url,
         sessionId: data.sessionId || null,
-        events: data.events || ['*'],
-        headers: headers,
+        // SQLite doesn't support JSON, so stringify arrays/objects
+        events: Array.isArray(events) ? JSON.stringify(events) : events,
+        headers: headers ? JSON.stringify(headers) : null,
         secret: secret,
         isActive: data.isActive !== false,
         retries: data.retries || 3,
-        // Store retry config in headers JSON as metadata (for future use)
-        // retryDelay and retryPolicy can be stored as part of headers if needed
       },
     });
   }
@@ -89,16 +89,24 @@ class WebhookService {
    * @returns {Promise<object>}
    */
   async updateWebhook(id, data) {
+    const updateData = {
+      url: data.url,
+      sessionId: data.sessionId,
+      isActive: data.isActive,
+      retries: data.retries,
+    };
+    
+    // SQLite doesn't support JSON, so stringify arrays/objects
+    if (data.events !== undefined) {
+      updateData.events = Array.isArray(data.events) ? JSON.stringify(data.events) : data.events;
+    }
+    if (data.headers !== undefined) {
+      updateData.headers = data.headers ? JSON.stringify(data.headers) : null;
+    }
+    
     return prisma.webhook.update({
       where: { id },
-      data: {
-        url: data.url,
-        sessionId: data.sessionId,
-        events: data.events,
-        headers: data.headers,
-        isActive: data.isActive,
-        retries: data.retries,
-      },
+      data: updateData,
     });
   }
 
@@ -138,7 +146,15 @@ class WebhookService {
 
       for (const webhook of webhooks) {
         // Check if event matches
-        const events = webhook.events || ['*'];
+        // Handle both JSON string (SQLite) and array (MySQL) formats
+        let events = webhook.events || ['*'];
+        if (typeof events === 'string') {
+          try {
+            events = JSON.parse(events);
+          } catch (e) {
+            events = [events]; // Fallback to single event string
+          }
+        }
         const matches = events.includes('*') || 
                         events.includes(eventType) ||
                         events.some(e => eventType.startsWith(e.replace('*', '')));
@@ -212,13 +228,23 @@ class WebhookService {
     // Generate signature
     const signature = generateWebhookSignature(payload, webhook.secret);
 
+    // Parse custom headers (handle JSON string from SQLite)
+    let customHeaders = webhook.headers || {};
+    if (typeof customHeaders === 'string') {
+      try {
+        customHeaders = JSON.parse(customHeaders);
+      } catch (e) {
+        customHeaders = {};
+      }
+    }
+
     // Build headers
     const headers = {
       'Content-Type': 'application/json',
       'X-Webhook-Signature': signature,
       'X-Webhook-Event': eventType,
       'X-Webhook-Session': sessionName,
-      ...(webhook.headers || {}),
+      ...customHeaders,
     };
 
     try {
