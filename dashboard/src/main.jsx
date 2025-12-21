@@ -8,9 +8,12 @@ import { SocketProvider } from './context/SocketContext';
 import { WorkersProvider } from './context/WorkersContext';
 import './index.css';
 
+// Use /dashboard as base path in production
+const basename = import.meta.env.PROD ? '/dashboard' : '/';
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <AuthProvider>
         <WorkersProvider>
           <SocketProvider>
