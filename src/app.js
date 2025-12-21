@@ -18,7 +18,7 @@ const { initWebSocket } = require('./websocket');
 const whatsappService = require('./services/whatsapp.service');
 const webhookService = require('./services/webhook.service');
 
-const { checkLicense } = require('./license')
+const { checkLicense } = require('./license');
 
 (async () => {
   const valid = await checkLicense()
