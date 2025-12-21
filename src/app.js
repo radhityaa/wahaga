@@ -20,6 +20,10 @@ const webhookService = require('./services/webhook.service');
 
 const { checkLicense } = require('./license');
 
+// Create Express app
+const app = express();
+const server = http.createServer(app);
+
 (async () => {
   const valid = await checkLicense()
 
@@ -27,10 +31,6 @@ const { checkLicense } = require('./license');
       console.error('[LICENSE] Invalid or expired');
       process.exit(1);
   }
-
-  // Create Express app
-const app = express();
-const server = http.createServer(app);
 
 // Initialize WebSocket
 initWebSocket(server);
