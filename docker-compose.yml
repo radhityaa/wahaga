@@ -58,6 +58,10 @@ services:
       
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-info}
+
+      # License
+      - LICENSE_KEY=WAHAGA-123456789
+      - LICENSE_SERVER=https://license.ayasyatech.cloud
     volumes:
       # Persistent storage
       - wa_data:/app/data

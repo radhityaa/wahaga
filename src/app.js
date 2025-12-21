@@ -18,7 +18,17 @@ const { initWebSocket } = require('./websocket');
 const whatsappService = require('./services/whatsapp.service');
 const webhookService = require('./services/webhook.service');
 
-// Create Express app
+const { checkLicense } = require('./license')
+
+(async () => {
+  const valid = await checkLicense()
+
+  if (!valid) {
+      console.error('[LICENSE] Invalid or expired');
+      process.exit(1);
+  }
+
+  // Create Express app
 const app = express();
 const server = http.createServer(app);
 
@@ -194,6 +204,6 @@ const startServer = async () => {
 };
 
 startServer();
+})()
 
 module.exports = app;
-
