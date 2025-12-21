@@ -100,6 +100,16 @@ USER wagateway
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Information
+ARG APP_VERSION=unknown
+
+LABEL maintainer="WhatsApp Gateway"
+LABEL description="WhatsApp Gateway API - Multi-device support with Baileys"
+LABEL version=$APP_VERSION
+
+ENV APP_VERSION=$APP_VERSION
+ENV UPDATE_MODEL="subscription-based"
+
 # Database (SQLite - Built-in, no configuration needed!)
 ENV DATABASE_URL="file:/app/data/whatsapp.db"
 
