@@ -15,7 +15,7 @@ services:
   # WhatsApp Gateway API + Dashboard
   # =================================
   whatsapp-gateway:
-    image: ghcr.io/radhityaa/wa-gateway:${WA_VERSION:-latest}
+    image: ghcr.io/radhityaa/wahaga:${WA_VERSION:-latest}
     container_name: whatsapp-gateway
     restart: unless-stopped
     ports:
