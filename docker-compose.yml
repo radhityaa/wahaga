@@ -59,10 +59,6 @@ services:
       
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-info}
-
-      # License
-      - LICENSE_KEY=${LICENSE_KEY:-}
-      - LICENSE_SERVER=https://license.ayasyatech.cloud
     volumes:
       # Persistent storage
       - wa_data:/app/data
