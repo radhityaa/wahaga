@@ -30,3 +30,5 @@ prisma/*.db-journal
 # Build
 dist/
 build/
+
+public/dashboard
