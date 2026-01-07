@@ -265,9 +265,37 @@ class WhatsAppService {
             await this.updateSessionInDb(sessionName, { status: 'disconnected' });
           }
         } else {
-          // Logged out, clean up
+          // Logged out - update status but keep session in database
           loggerInstance.info('Session logged out');
-          await this.deleteSession(sessionName, false);
+          
+          // Clean up socket and memory
+          const existingSocket = this.sessions.get(sessionName);
+          if (existingSocket) {
+            try {
+              existingSocket.end();
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+          this.sessions.delete(sessionName);
+          
+          // Update state to disconnected
+          this.states.set(sessionName, { ...state, status: 'disconnected', qr: null, qrBase64: null });
+          
+          // Update database - keep session but update status
+          await this.updateSessionInDb(sessionName, { status: 'disconnected', qrCode: null });
+          
+          // Delete session auth files (so they can re-scan QR later)
+          const sessionPath = path.join(this.sessionDir, sessionName);
+          if (fs.existsSync(sessionPath)) {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+          }
+          
+          // Clear cache
+          await cacheService.delByPattern(`msg:${sessionName}:*`);
+          
+          // Emit session logged out event
+          await this.emitEvent(sessionName, 'session.loggedOut', { sessionName });
         }
 
         await this.emitEvent(sessionName, 'connection.close', { statusCode, shouldReconnect });
@@ -719,6 +747,48 @@ class WhatsAppService {
     }
     await sleep(1000);
     return this.createSession(sessionName);
+  }
+
+  /**
+   * Stop a session (disconnect without logout)
+   * This keeps the auth credentials so the session can be reconnected without scanning QR again
+   * @param {string} sessionName - Session name
+   * @returns {Promise<boolean>}
+   */
+  async stopSession(sessionName) {
+    const sessionLogger = createSessionLogger(sessionName);
+    sessionLogger.info('Stopping session (without logout)');
+
+    try {
+      const socket = this.sessions.get(sessionName);
+      
+      if (socket) {
+        try {
+          socket.end();
+        } catch (e) {
+          // Ignore errors when ending socket
+        }
+      }
+
+      // Remove from memory
+      this.sessions.delete(sessionName);
+      
+      // Update state to stopped
+      const state = this.states.get(sessionName) || {};
+      this.states.set(sessionName, { ...state, status: 'stopped', qr: null, qrBase64: null });
+
+      // Update database - keep session with stopped status
+      await this.updateSessionInDb(sessionName, { status: 'stopped', qrCode: null });
+
+      // Emit session stopped event
+      await this.emitEvent(sessionName, 'session.stopped', { sessionName });
+
+      sessionLogger.info('Session stopped successfully');
+      return true;
+    } catch (error) {
+      sessionLogger.error({ error }, 'Failed to stop session');
+      throw error;
+    }
   }
 
   /**

@@ -181,6 +181,52 @@ router.post('/:sessionId/restart', sessionController.restartSession);
 
 /**
  * @swagger
+ * /api/sessions/{sessionId}/stop:
+ *   post:
+ *     tags: [Sessions]
+ *     summary: Stop session (disconnect without logout)
+ *     description: |
+ *       Stops the WhatsApp connection but keeps auth credentials intact.
+ *       Session can be reconnected later without scanning QR code again using the restart endpoint.
+ *       
+ *       **Difference from logout:**
+ *       - Stop: Disconnects but keeps credentials (status: "stopped")
+ *       - Logout: Logs out from WhatsApp and clears credentials (status: "disconnected")
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Session name or ID
+ *         example: my-session
+ *     responses:
+ *       200:
+ *         description: Session stopped successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Session stopped (can be reconnected without QR scan)"
+ *       404:
+ *         description: Session not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/:sessionId/stop', sessionController.stopSession);
+
+/**
+ * @swagger
  * /api/sessions/{sessionId}/pair:
  *   post:
  *     tags: [Sessions]
@@ -219,7 +265,15 @@ router.post('/:sessionId/pair', sessionController.requestPairingCode);
  * /api/sessions/{sessionId}/logout:
  *   post:
  *     tags: [Sessions]
- *     summary: Logout session
+ *     summary: Logout session (complete logout from WhatsApp)
+ *     description: |
+ *       Logs out the session from WhatsApp completely. The linked device will be removed from WhatsApp.
+ *       Session record is kept in database but auth credentials are cleared.
+ *       To reconnect, you will need to scan a new QR code or use pairing code.
+ *       
+ *       **Difference from stop:**
+ *       - Logout: Logs out from WhatsApp and clears credentials (status: "disconnected")
+ *       - Stop: Disconnects but keeps credentials (status: "stopped")
  *     security:
  *       - ApiKeyAuth: []
  *     parameters:
@@ -229,9 +283,27 @@ router.post('/:sessionId/pair', sessionController.requestPairingCode);
  *         schema:
  *           type: string
  *         description: Session name or ID
+ *         example: my-session
  *     responses:
  *       200:
- *         description: Session logged out
+ *         description: Session logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Session logged out"
+ *       404:
+ *         description: Session not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.post('/:sessionId/logout', sessionController.logoutSession);
 

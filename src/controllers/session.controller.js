@@ -405,6 +405,52 @@ const restartSession = asyncHandler(async (req, res) => {
 
 /**
  * @swagger
+ * /api/sessions/{sessionId}/stop:
+ *   post:
+ *     tags: [Sessions]
+ *     summary: Stop session (disconnect without logout)
+ *     description: Stops the WhatsApp connection but keeps auth credentials. Session can be reconnected later without scanning QR code again.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Session stopped
+ */
+const stopSession = asyncHandler(async (req, res) => {
+  const { sessionId } = req.params;
+
+  const session = await prisma.session.findFirst({
+    where: {
+      OR: [
+        { id: sessionId },
+        { name: sessionId },
+      ],
+    },
+  });
+
+  if (!session) {
+    return res.status(404).json({
+      success: false,
+      message: 'Session not found',
+    });
+  }
+
+  await whatsappService.stopSession(session.name);
+
+  res.json({
+    success: true,
+    message: 'Session stopped (can be reconnected without QR scan)',
+  });
+});
+
+/**
+ * @swagger
  * /api/sessions/{sessionId}/pair:
  *   post:
  *     tags: [Sessions]
@@ -691,6 +737,7 @@ module.exports = {
   getQR,
   getStatus,
   restartSession,
+  stopSession,
   requestPairingCode,
   logoutSession,
   checkNumber,

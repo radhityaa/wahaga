@@ -42,7 +42,8 @@ const options = {
             name: { type: 'string' },
             status: { 
               type: 'string', 
-              enum: ['connected', 'disconnected', 'connecting', 'qr'] 
+              enum: ['connected', 'disconnected', 'connecting', 'qr', 'stopped'],
+              description: 'Session status. "stopped" means disconnected but auth credentials preserved for quick reconnect.'
             },
             phone: { type: 'string' },
             pushName: { type: 'string' },
