@@ -2,6 +2,20 @@ const swaggerJsdoc = require('swagger-jsdoc');
 
 // Get base URL from env or default to localhost
 const baseUrl = process.env.BASE_URL || process.env.SWAGGER_URL || `http://localhost:${process.env.PORT || 3000}`;
+const localUrl = `http://localhost:${process.env.PORT || 3000}`;
+
+// Build servers list - always include local server for development
+const servers = [];
+if (baseUrl && baseUrl !== localUrl) {
+  servers.push({
+    url: baseUrl,
+    description: 'Production server',
+  });
+}
+servers.push({
+  url: localUrl,
+  description: 'Local development server',
+});
 
 const options = {
   definition: {
@@ -19,12 +33,7 @@ const options = {
         url: 'https://opensource.org/licenses/MIT',
       },
     },
-    servers: [
-      {
-        url: baseUrl,
-        description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
-      },
-    ],
+    servers,
     components: {
       securitySchemes: {
         ApiKeyAuth: {
