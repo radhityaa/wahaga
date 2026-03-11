@@ -64,6 +64,14 @@ export const SocketProvider = ({ children }) => {
       );
     });
 
+    newSocket.on('session:stopped', (data) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.name === data.session ? { ...s, status: 'stopped' } : s
+        )
+      );
+    });
+
     newSocket.on('session:qr', (data) => {
       setSessions((prev) =>
         prev.map((s) =>

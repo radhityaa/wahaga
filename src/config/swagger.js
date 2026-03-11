@@ -6,6 +6,12 @@ const localUrl = `http://localhost:${process.env.PORT || 3000}`;
 
 // Build servers list - always include local server for development
 const servers = [];
+// Relative URL will use the current host, port and protocol the user is on
+servers.push({
+  url: '/',
+  description: 'Current server (relative)',
+});
+
 if (baseUrl && baseUrl !== localUrl) {
   servers.push({
     url: baseUrl,

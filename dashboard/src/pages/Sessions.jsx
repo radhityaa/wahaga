@@ -17,6 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   Minus,
+  Play,
+  Square,
 } from 'lucide-react';
 
 // React-Select custom styles for dark theme
@@ -306,6 +308,38 @@ const Sessions = () => {
     }
   };
 
+  const startSession = async (session) => {
+    try {
+      const headers = {};
+      if (session.worker.apiKey) headers['x-api-key'] = session.worker.apiKey;
+      
+      await fetch(`${session.worker.url}/api/sessions/${session.name}/restart`, {
+        method: 'POST',
+        headers,
+      });
+      toast.success('Session starting...');
+      fetchSessions();
+    } catch (error) {
+      toast.error('Failed to start session');
+    }
+  };
+
+  const stopSession = async (session) => {
+    try {
+      const headers = {};
+      if (session.worker.apiKey) headers['x-api-key'] = session.worker.apiKey;
+      
+      await fetch(`${session.worker.url}/api/sessions/${session.name}/stop`, {
+        method: 'POST',
+        headers,
+      });
+      toast.success('Session stopped');
+      fetchSessions();
+    } catch (error) {
+      toast.error('Failed to stop session');
+    }
+  };
+
   const restartSession = async (session) => {
     try {
       const headers = {};
@@ -322,6 +356,9 @@ const Sessions = () => {
   };
 
   const logoutSession = async (session) => {
+    if (!confirm(`Logout session "${session.name}"? You will need to scan QR code again to reconnect.`)) {
+      return;
+    }
     try {
       const headers = {};
       if (session.worker.apiKey) headers['x-api-key'] = session.worker.apiKey;
@@ -348,6 +385,9 @@ const Sessions = () => {
       connected: 'badge-success',
       disconnected: 'badge-danger',
       connecting: 'badge-warning',
+      reconnecting: 'badge-warning',
+      stopped: 'badge-danger',
+      created: 'badge-info',
       qr: 'badge-info',
     };
     return badges[status] || 'badge-info';
@@ -430,29 +470,59 @@ const Sessions = () => {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2">
-                  {(session.liveStatus === 'qr' || session.liveStatus === 'disconnected') && (
+                  {/* Start button - shown when disconnected/stopped/created */}
+                  {(['disconnected', 'stopped', 'created'].includes(session.liveStatus)) && (
                     <button
-                      onClick={() => showQr(session)}
+                      onClick={() => startSession(session)}
                       className="btn btn-outline btn-sm flex items-center gap-1"
+                      title="Start session"
                     >
-                      <QrCode className="w-4 h-4" />
-                      QR Code
+                      <Play className="w-4 h-4" />
+                      Start
                     </button>
                   )}
-                  <button
-                    onClick={() => restartSession(session)}
-                    className="btn btn-outline btn-sm flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Restart
-                  </button>
+                  {/* Stop button - shown when connecting */}
+                  {session.liveStatus === 'connecting' && (
+                    <button
+                      onClick={() => stopSession(session)}
+                      className="btn btn-outline btn-sm flex items-center gap-1"
+                      title="Stop session"
+                    >
+                      <Square className="w-4 h-4" />
+                      Stop
+                    </button>
+                  )}
+                  {/* Restart button - shown when connected or reconnecting */}
+                  {(['connected', 'reconnecting'].includes(session.liveStatus)) && (
+                    <button
+                      onClick={() => restartSession(session)}
+                      className="btn btn-outline btn-sm flex items-center gap-1"
+                      title="Restart session"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Restart
+                    </button>
+                  )}
+                  {/* Logout button - shown when connected */}
                   {session.liveStatus === 'connected' && (
                     <button
                       onClick={() => logoutSession(session)}
                       className="btn btn-outline btn-sm flex items-center gap-1"
+                      title="Logout from WhatsApp"
                     >
                       <LogOut className="w-4 h-4" />
                       Logout
+                    </button>
+                  )}
+                  {/* QR Code button - shown when status is qr */}
+                  {session.liveStatus === 'qr' && (
+                    <button
+                      onClick={() => showQr(session)}
+                      className="btn btn-outline btn-sm flex items-center gap-1"
+                      title="Show QR Code"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      QR Code
                     </button>
                   )}
                   <button
@@ -692,6 +762,15 @@ const Sessions = () => {
             setShowQrModal(false);
             setSelectedSession(null);
             setSelectedWorker(null);
+            // Refresh session list when modal is closed
+            fetchSessions();
+          }}
+          onConnected={() => {
+            setShowQrModal(false);
+            setSelectedSession(null);
+            setSelectedWorker(null);
+            // Force a refresh to get the latest phone/pushName from DB
+            fetchSessions();
           }}
         />
       )}
@@ -700,7 +779,7 @@ const Sessions = () => {
 };
 
 // QR Modal Component
-const QrModal = ({ session, worker, sessions, onClose }) => {
+const QrModal = ({ session, worker, sessions, onClose, onConnected }) => {
   const [qrData, setQrData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -713,7 +792,7 @@ const QrModal = ({ session, worker, sessions, onClose }) => {
     }
   }, [session.name, worker]);
 
-  // Check real-time updates
+  // Check real-time updates via WebSocket
   useEffect(() => {
     const liveSession = sessions.find((s) => s.name === session.name);
     if (liveSession?.qrBase64) {
@@ -721,8 +800,8 @@ const QrModal = ({ session, worker, sessions, onClose }) => {
       setLoading(false);
     }
     if (liveSession?.status === 'connected') {
-      toast.success('Session connected!');
-      onClose();
+      toast.success(`✅ Session "${session.name}" connected!`);
+      onConnected();
     }
   }, [sessions, session.name]);
 

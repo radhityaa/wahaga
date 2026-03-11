@@ -85,11 +85,31 @@ const initWebSocket = (server) => {
 
     // Handle specific events
     switch (event) {
+      // 'session.status' is emitted by whatsapp.service with SCAN_QR_CODE or WORKING
+      case 'session.status':
+        if (data.status === 'SCAN_QR_CODE') {
+          io.to('dashboard').emit('session:qr', {
+            session: sessionName,
+            qrBase64: data.qrBase64,
+          });
+          io.to('dashboard').emit('sessions:state', whatsappService.getAllSessions());
+        } else if (data.status === 'WORKING') {
+          io.to('dashboard').emit('session:connected', {
+            session: sessionName,
+            phone: data.phone,
+            pushName: data.pushName,
+          });
+          io.to('dashboard').emit('sessions:state', whatsappService.getAllSessions());
+        }
+        break;
+
+      // Fallback: legacy 'qr' event if anyone uses it directly
       case 'qr':
         io.to('dashboard').emit('session:qr', {
           session: sessionName,
           qrBase64: data.qrBase64,
         });
+        io.to('dashboard').emit('sessions:state', whatsappService.getAllSessions());
         break;
       
       case 'connection.open':
@@ -109,6 +129,21 @@ const initWebSocket = (server) => {
         io.to('dashboard').emit('sessions:state', whatsappService.getAllSessions());
         break;
 
+      case 'session.loggedOut':
+        io.to('dashboard').emit('session:disconnected', {
+          session: sessionName,
+          statusCode: 401,
+        });
+        io.to('dashboard').emit('sessions:state', whatsappService.getAllSessions());
+        break;
+
+      case 'session.stopped':
+        io.to('dashboard').emit('session:stopped', {
+          session: sessionName,
+        });
+        io.to('dashboard').emit('sessions:state', whatsappService.getAllSessions());
+        break;
+
       case 'message.received':
         io.to('dashboard').emit('message:received', {
           session: sessionName,
@@ -123,6 +158,7 @@ const initWebSocket = (server) => {
         });
         break;
     }
+
   });
 
   logger.info('WebSocket server initialized');

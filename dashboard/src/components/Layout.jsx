@@ -69,33 +69,6 @@ const Layout = () => {
             </NavLink>
           ))}
         </nav>
-
-        {/* Connection Status & Logout */}
-        <div className="p-4 border-t border-dark-800 space-y-4">
-          {/* WebSocket Status */}
-          <div className="flex items-center gap-2 text-sm">
-            {connected ? (
-              <>
-                <Wifi className="w-4 h-4 text-green-500" />
-                <span className="text-green-400">Live connected</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-4 h-4 text-red-500" />
-                <span className="text-red-400">Disconnected</span>
-              </>
-            )}
-          </div>
-
-          {/* Logout Button */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors text-gray-400 hover:text-white"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Disconnect</span>
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}

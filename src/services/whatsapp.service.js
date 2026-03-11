@@ -14,6 +14,7 @@ const { Boom } = require('@hapi/boom');
 const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
+const NodeCache = require('node-cache');
 const QRCode = require('qrcode');
 const config = require('../config');
 const { logger, createSessionLogger } = require('../utils/logger');
@@ -32,6 +33,8 @@ class WhatsAppService {
     // Session storage directory
     this.sessionDir = config.paths.sessions;
     ensureDir(this.sessionDir);
+    // Message retry counter caches per session (required by Baileys v7 to prevent decrypt loops)
+    this.msgRetryCaches = new Map();
   }
 
   /**
@@ -103,37 +106,56 @@ class WhatsAppService {
     const sessionLogger = createSessionLogger(sessionName);
     sessionLogger.info('Creating session');
 
-    // Check if session already exists
+    // Check if session already exists and is already connected
     if (this.sessions.has(sessionName)) {
       const socket = this.sessions.get(sessionName);
       if (socket?.user) {
         sessionLogger.info('Session already connected');
         return { success: true, message: 'Session already connected' };
       }
+      // Clean up stale socket before creating a new one
+      try { socket.end(); } catch (e) { /* ignore */ }
+      this.sessions.delete(sessionName);
     }
 
-    // Check max sessions limit
+    // Check max sessions limit (minus the one we just removed if any)
     if (this.sessions.size >= config.whatsapp.maxSessions) {
       throw new Error(`Maximum sessions limit (${config.whatsapp.maxSessions}) reached`);
     }
 
     try {
+      // Fetch latest WhatsApp Web version to avoid protocol mismatch (515/405 errors)
+      const { version, isLatest } = await fetchLatestBaileysVersion();
+      sessionLogger.info({ version: version.join('.'), isLatest }, 'Using WA version');
+
       // Setup auth state
       const sessionPath = path.join(this.sessionDir, sessionName);
       ensureDir(sessionPath);
       const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
+      // Per-session message retry counter cache - keeps this out of the socket
+      // to prevent a message decryption/encryption loop across socket restarts
+      if (!this.msgRetryCaches.has(sessionName)) {
+        this.msgRetryCaches.set(sessionName, new NodeCache());
+      }
+      const msgRetryCounterCache = this.msgRetryCaches.get(sessionName);
+
       // Create socket options with group caching
       const socketOptions = {
+        version,
         auth: {
           creds: state.creds,
           keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
         },
         logger: pino({ level: 'warn' }),
         printQRInTerminal: true,
-        browser: Browsers.macOS('Desktop'),
-        syncFullHistory: true,
+        // Use ubuntu/chrome - less likely to trigger stream errors than macOS/Desktop in v7-rc
+        browser: Browsers.ubuntu('Chrome'),
+        // Disable full history sync - it slows down initial connection and can cause timeouts
+        syncFullHistory: false,
         markOnlineOnConnect: false,
+        // Required for Baileys v7: message retry counter to prevent decrypt loops
+        msgRetryCounterCache,
         // Group metadata cache - required for group messaging
         cachedGroupMetadata: async (jid) => {
           return cacheService.getGroupMetadata(jid);
@@ -161,8 +183,21 @@ class WhatsAppService {
       // Update database
       await this.updateSessionInDb(sessionName, { status: 'connecting' });
 
+      // Wrap saveCreds with a guard to prevent ENOENT crash if the session
+      // directory is deleted during logout before the creds.update event fires
+      const saveCredsSafe = async () => {
+        if (fs.existsSync(sessionPath)) {
+          try {
+            await saveCreds();
+          } catch (e) {
+            sessionLogger.warn({ err: e.message }, 'saveCreds failed (session may have been deleted)');
+          }
+        }
+      };
+
       // Bind event handlers
-      this.bindEvents(sessionName, socket, saveCreds, sessionLogger);
+      this.bindEvents(sessionName, socket, saveCredsSafe, sessionLogger);
+
 
       return { success: true, message: 'Session created, waiting for QR scan' };
     } catch (error) {
@@ -237,9 +272,11 @@ class WhatsAppService {
         // Stream error (515) or restart needed - clear QR and reconnect
         if (statusCode === 515 || statusCode === 405) {
           loggerInstance.info('Stream error, clearing session and reconnecting...');
-          // Clear QR so new one is generated
+          // Properly clean up old socket first to avoid race condition
+          this.sessions.delete(sessionName);
           this.states.set(sessionName, { ...state, status: 'connecting', qr: null, qrBase64: null, retryCount: 0 });
-          await sleep(2000);
+          // Wait a bit longer to let WA server settle before reconnecting
+          await sleep(3000);
           await this.createSession(sessionName);
           return;
         }
@@ -703,15 +740,21 @@ class WhatsAppService {
           try {
             await socket.logout();
           } catch (e) {
-            // Ignore logout errors
+            // Ignore logout errors (e.g. 428 Connection Closed - already disconnected)
+            sessionLogger.warn({ err: e.message }, 'socket.logout() error (ignored)');
           }
         }
-        socket.end();
+        try { socket.end(); } catch (e) { /* ignore */ }
+        // Wait briefly so any in-flight creds.update / saveCreds callbacks
+        // can fire and be caught by saveCredsSafe before we delete the folder
+        await sleep(500);
       }
 
       // Remove from memory
       this.sessions.delete(sessionName);
       this.states.delete(sessionName);
+      // Also clean up retry cache for this session
+      this.msgRetryCaches.delete(sessionName);
 
       // Delete session files
       const sessionPath = path.join(this.sessionDir, sessionName);
@@ -719,7 +762,7 @@ class WhatsAppService {
         fs.rmSync(sessionPath, { recursive: true, force: true });
       }
 
-      // Delete from database
+      // Delete from database (full removal)
       await prisma.session.deleteMany({ where: { name: sessionName } });
 
       // Clear cache
@@ -733,6 +776,64 @@ class WhatsAppService {
       throw error;
     }
   }
+
+  /**
+   * Logout a session from WhatsApp but KEEP the session record in database.
+   * User can re-scan QR code to reconnect without having to re-add the session.
+   * @param {string} sessionName - Session name
+   * @returns {Promise<boolean>}
+   */
+  async logoutSession(sessionName) {
+    const sessionLogger = createSessionLogger(sessionName);
+    sessionLogger.info('Logging out session (keeping DB record)');
+
+    try {
+      const socket = this.sessions.get(sessionName);
+
+      if (socket) {
+        try {
+          await socket.logout();
+        } catch (e) {
+          // Ignore logout errors (428 = connection already closed, etc.)
+          sessionLogger.warn({ err: e.message }, 'socket.logout() error (ignored)');
+        }
+        try { socket.end(); } catch (e) { /* ignore */ }
+        // Wait for any pending creds.update to fire safely before deleting files
+        await sleep(500);
+      }
+
+      // Remove from memory (socket + state)
+      this.sessions.delete(sessionName);
+      this.states.delete(sessionName);
+      this.msgRetryCaches.delete(sessionName);
+
+      // Delete session auth files so a fresh QR can be generated on next connect
+      const sessionPath = path.join(this.sessionDir, sessionName);
+      if (fs.existsSync(sessionPath)) {
+        fs.rmSync(sessionPath, { recursive: true, force: true });
+      }
+
+      // Update status in DB - keep the row so dashboard still shows it
+      await this.updateSessionInDb(sessionName, {
+        status: 'disconnected',
+        phone: null,
+        pushName: null,
+        qrCode: null,
+      });
+
+      // Clear message cache
+      await cacheService.delByPattern(`msg:${sessionName}:*`);
+
+      await this.emitEvent(sessionName, 'session.loggedOut', { sessionName });
+
+      sessionLogger.info('Session logged out, DB record kept for re-scan');
+      return true;
+    } catch (error) {
+      sessionLogger.error({ error }, 'Failed to logout session');
+      throw error;
+    }
+  }
+
 
   /**
    * Restart a session

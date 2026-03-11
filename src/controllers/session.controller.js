@@ -573,19 +573,13 @@ const logoutSession = asyncHandler(async (req, res) => {
     });
   }
 
-  const socket = whatsappService.getSession(session.name);
-  if (socket) {
-    await socket.logout();
-  }
-
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { status: 'disconnected', qrCode: null },
-  });
+  // Logout: disconnect from WA, delete auth files, UPDATE status in DB (NOT delete row)
+  // User can re-scan QR to reconnect without re-adding the session
+  await whatsappService.logoutSession(session.name);
 
   res.json({
     success: true,
-    message: 'Session logged out',
+    message: 'Session logged out. Scan QR code to reconnect.',
   });
 });
 
