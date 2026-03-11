@@ -190,9 +190,14 @@ const Dashboard = () => {
                     <div className={`status-dot ${session.status}`} />
                     <div>
                       <p className="font-medium">{session.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {session.phone || 'Not connected'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-500">
+                          {session.phone || 'Not connected'}
+                        </p>
+                        <span className={`badge ${session.status === 'connected' ? 'badge-success' : session.status === 'disconnected' || session.status === 'stopped' ? 'badge-danger' : 'badge-warning'} text-[10px] px-1.5 py-0.5`}>
+                          {session.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   {session.pushName && (

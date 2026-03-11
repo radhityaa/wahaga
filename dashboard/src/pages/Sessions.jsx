@@ -394,13 +394,29 @@ const Sessions = () => {
   };
 
   // Merge live sessions with DB sessions
-  const mergedSessions = dbSessions.map((dbSession) => {
+  const mergedSessions = [...dbSessions.map((dbSession) => {
     const liveSession = sessions.find((s) => s.name === dbSession.name);
     return {
       ...dbSession,
-      liveStatus: liveSession?.status || dbSession.status,
+      liveStatus: liveSession?.status || dbSession.liveStatus || dbSession.status,
       qrBase64: liveSession?.qrBase64,
     };
+  })];
+
+  // Also append any live session from WebSocket that isn't in DB yet
+  sessions.forEach((liveSession) => {
+    if (!mergedSessions.find((s) => s.name === liveSession.name)) {
+      mergedSessions.push({
+        id: liveSession.name,
+        name: liveSession.name,
+        phone: liveSession.phone,
+        pushName: liveSession.pushName,
+        liveStatus: liveSession.status,
+        qrBase64: liveSession.qrBase64,
+        createdAt: new Date().toISOString(),
+        worker: workers[0] || {},
+      });
+    }
   });
 
   return (
